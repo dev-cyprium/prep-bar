@@ -1,0 +1,6 @@
+## Interface: 120000
+## Title: MouseoverBar
+## Author: Silkroot
+## Version: 1.0
+
+MouseoverBar.lua
