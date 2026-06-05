@@ -1,0 +1,27 @@
+## Interface: 120000
+## Title: PrepBar
+## Author: Silkroot
+## Version: 1.0
+## Notes: Mouseover-fade action bars and a movable per-spec consumables bar (flask, food, oil, augment rune).
+## SavedVariables: PrepBarDB
+## X-Category: Action Bars
+## IconTexture: Interface\Icons\Trade_Alchemy
+
+Ids.lua
+Specs.lua
+Consumables.lua
+Consumables\DeathKnight.lua
+Consumables\DemonHunter.lua
+Consumables\Druid.lua
+Consumables\Evoker.lua
+Consumables\Hunter.lua
+Consumables\Mage.lua
+Consumables\Monk.lua
+Consumables\Paladin.lua
+Consumables\Priest.lua
+Consumables\Rogue.lua
+Consumables\Shaman.lua
+Consumables\Warlock.lua
+Consumables\Warrior.lua
+ConsumeBar.lua
+PrepBar.lua

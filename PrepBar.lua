@@ -1,4 +1,4 @@
-local ADDON_NAME = "MouseoverBar"
+local ADDON_NAME = "PrepBar"
 
 local SUPPORTED_BARS = {
     "MainMenuBar",
@@ -52,19 +52,19 @@ local function NewController(barName)
     self.updater:Hide()
     self.updater:SetScript("OnUpdate", function(_, dt)
         self.accum = self.accum + dt
-        if self.accum < MouseoverBarDB.pollInterval then return end
+        if self.accum < PrepBarDB.pollInterval then return end
         self.accum = 0
 
         if MouseIsOverBar() then
             self.hideAccum = 0
             if not self.shown then
-                bar:SetAlpha(MouseoverBarDB.shownAlpha)
+                bar:SetAlpha(PrepBarDB.shownAlpha)
                 self.shown = true
             end
         elseif self.shown then
-            self.hideAccum = self.hideAccum + MouseoverBarDB.pollInterval
-            if self.hideAccum >= MouseoverBarDB.hideDelay then
-                bar:SetAlpha(MouseoverBarDB.hiddenAlpha)
+            self.hideAccum = self.hideAccum + PrepBarDB.pollInterval
+            if self.hideAccum >= PrepBarDB.hideDelay then
+                bar:SetAlpha(PrepBarDB.hiddenAlpha)
                 self.shown = false
             end
         end
@@ -79,14 +79,14 @@ local function NewController(barName)
 
     function self:Enable()
         RefreshChildren()
-        bar:SetAlpha(MouseoverBarDB.hiddenAlpha)
+        bar:SetAlpha(PrepBarDB.hiddenAlpha)
         self.shown = false
         self.updater:Show()
     end
 
     function self:Disable()
         self.updater:Hide()
-        bar:SetAlpha(MouseoverBarDB.shownAlpha)
+        bar:SetAlpha(PrepBarDB.shownAlpha)
         self.shown = true
     end
 
@@ -107,22 +107,25 @@ end
 
 local function ApplyAll()
     for _, name in ipairs(SUPPORTED_BARS) do
-        ApplyBar(name, MouseoverBarDB.bars[name] == true)
+        ApplyBar(name, PrepBarDB.bars[name] == true)
     end
 end
 
 ----------------------------------------------------------------------
--- Settings panel  (Esc → Options → AddOns → MouseoverBar)
+-- Settings panel  (Esc → Options → AddOns → PrepBar)
 ----------------------------------------------------------------------
+local settingsCategory
+
 local function BuildSettingsPanel()
-    local category = Settings.RegisterVerticalLayoutCategory(ADDON_NAME)
+    local category, layout = Settings.RegisterVerticalLayoutCategory(ADDON_NAME)
+    settingsCategory = category
 
     for _, barName in ipairs(SUPPORTED_BARS) do
         local setting = Settings.RegisterAddOnSetting(
             category,
             ADDON_NAME .. "_" .. barName,
             barName,
-            MouseoverBarDB.bars,
+            PrepBarDB.bars,
             Settings.VarType.Boolean,
             barName,
             false
@@ -134,21 +137,31 @@ local function BuildSettingsPanel()
         end)
     end
 
+    if PrepBar_ConsumeBar then
+        PrepBar_ConsumeBar:BuildSettings(category, layout)
+    end
+
     Settings.RegisterAddOnCategory(category)
+
+    SLASH_PREPBAR1 = "/pb"
+    SLASH_PREPBAR2 = "/prepbar"
+    SlashCmdList["PREPBAR"] = function()
+        Settings.OpenToCategory(settingsCategory:GetID())
+    end
 end
 
 ----------------------------------------------------------------------
 -- Init
 ----------------------------------------------------------------------
 local function InitDB()
-    MouseoverBarDB = MouseoverBarDB or {}
+    PrepBarDB = PrepBarDB or {}
     for k, v in pairs(DEFAULTS) do
-        if MouseoverBarDB[k] == nil then
+        if PrepBarDB[k] == nil then
             if type(v) == "table" then
-                MouseoverBarDB[k] = {}
-                for kk, vv in pairs(v) do MouseoverBarDB[k][kk] = vv end
+                PrepBarDB[k] = {}
+                for kk, vv in pairs(v) do PrepBarDB[k][kk] = vv end
             else
-                MouseoverBarDB[k] = v
+                PrepBarDB[k] = v
             end
         end
     end
@@ -163,5 +176,6 @@ f:SetScript("OnEvent", function(_, event, name)
         BuildSettingsPanel()
     elseif event == "PLAYER_LOGIN" then
         ApplyAll()
+        if PrepBar_ConsumeBar then PrepBar_ConsumeBar:Init() end
     end
 end)
