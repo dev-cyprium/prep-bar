@@ -1,7 +1,7 @@
 ## Interface: 120000
 ## Title: PrepBar
 ## Author: Silkroot
-## Version: 1.0
+## Version: 1.0.0
 ## Notes: Mouseover-fade action bars and a movable per-spec consumables bar (flask, food, oil, augment rune).
 ## SavedVariables: PrepBarDB
 ## X-Category: Action Bars
