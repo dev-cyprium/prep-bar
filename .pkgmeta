@@ -1,0 +1,5 @@
+package-as: PrepBar
+
+ignore:
+  - .github
+  - README.md
