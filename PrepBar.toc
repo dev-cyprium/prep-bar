@@ -5,6 +5,7 @@
 ## Notes: Mouseover-fade action bars and a movable per-spec consumables bar (flask, food, oil, augment rune).
 ## SavedVariables: PrepBarDB
 ## X-Category: Action Bars
+## X-Curse-Project-ID: 1565986
 ## IconTexture: Interface\Icons\Trade_Alchemy
 
 Ids.lua
