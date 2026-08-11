@@ -2,14 +2,15 @@
 ## Title: PrepBar
 ## Author: Silkroot
 ## Version: 1.0.0
-## Notes: Mouseover-fade action bars and a movable per-spec consumables bar (flask, food, oil, augment rune).
+## Notes: A movable per-spec consumables bar (flask, food, weapon oil, augment rune).
 ## SavedVariables: PrepBarDB
-## X-Category: Action Bars
+## X-Category: Buffs & Debuffs
 ## X-Curse-Project-ID: 1565986
 ## IconTexture: Interface\Icons\Trade_Alchemy
 
 Ids.lua
 Specs.lua
+Foods.lua
 Consumables.lua
 Consumables\DeathKnight.lua
 Consumables\DemonHunter.lua
@@ -24,5 +25,8 @@ Consumables\Rogue.lua
 Consumables\Shaman.lua
 Consumables\Warlock.lua
 Consumables\Warrior.lua
-ConsumeBar.lua
+ConsumeBar\Core.lua
+ConsumeBar\Buttons.lua
+ConsumeBar\Bar.lua
+ConsumeBar\Settings.lua
 PrepBar.lua

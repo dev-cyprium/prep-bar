@@ -31,6 +31,9 @@ function PrepBar_Consumables:Get(classToken, specID)
     for k, v in pairs(SHARED) do
         if slots[k] == nil then slots[k] = v end
     end
+    -- Food runs through the global/class/spec override hierarchy; resolve it
+    -- fresh every call so a changed (or cleared) override never goes stale.
+    slots.food = (PrepBar_Food and PrepBar_Food:ResolveOverride(classToken, specID)) or SHARED.food
     return slots
 end
 
