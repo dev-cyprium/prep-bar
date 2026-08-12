@@ -2,9 +2,16 @@ local ADDON_NAME = "PrepBar"
 local M = PrepBar_ConsumeBar
 local SLOT_ORDER, SLOT_LABEL, DEFAULTS = M.SLOT_ORDER, M.SLOT_LABEL, M.DEFAULTS
 
--- Dropdown label for a food registry key: "|Ticon|t Item Name". Name comes from
+-- Override slots exposed in the settings UI, in display order.
+local OV_SLOTS = {
+    { slot = "flask", label = "Flask" },
+    { slot = "food",  label = "Food" },
+    { slot = "oil",   label = "Oil" },
+}
+
+-- Dropdown label for a registry key: "|Ticon|t Item Name". Name comes from
 -- cached item data (pre-warmed at login); falls back to the key until cached.
-local function FoodLabel(key)
+local function ItemLabel(key)
     local list = PrepBar_Items[key]
     local id = list and list[1]
     if not id then return key end
@@ -31,6 +38,15 @@ local function SpecLabel(specID)
     name = name or ("Spec " .. specID)
     if icon then return ("|T%d:16:16:0:0|t %s"):format(icon, name) end
     return name
+end
+
+local function ChoiceOptions(slot, inheritLabel)
+    return function()
+        local c = Settings.CreateControlTextContainer()
+        c:Add("", inheritLabel)
+        for _, key in ipairs(PrepBar_Choices[slot]) do c:Add(key, ItemLabel(key)) end
+        return c:GetData()
+    end
 end
 
 -- Adds this module's controls to the shared PrepBar settings category.
@@ -87,7 +103,7 @@ function M:BuildSettings(category, layout)
     end
 
     self:BuildToggleSettings(category, layout)
-    self:BuildFoodSettings(category, layout)
+    self:BuildOverrideSettings(category, layout)
 end
 
 -- The per-slot overlay toggles: a master on/off plus which feast the food toggle swaps to.
@@ -103,27 +119,27 @@ function M:BuildToggleSettings(category, layout)
         "Show small toggles on the flask (quality: Auto/Gold/Silver) and food (Current/Feast) buttons.")
     show:SetValueChangedCallback(function() M:Update() end)
 
-    if PrepBar_Food and Settings.CreateDropdown then
+    if PrepBar_Overrides and Settings.CreateDropdown then
         local feast = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_ConsumeBar_FeastFood",
             "feastFood", db, Settings.VarType.String, "Feast food", DEFAULTS.feastFood)
         Settings.CreateDropdown(category, feast, function()
             local c = Settings.CreateControlTextContainer()
-            for _, key in ipairs(PrepBar_FoodChoices) do c:Add(key, FoodLabel(key)) end
+            for _, key in ipairs(PrepBar_Choices.food) do c:Add(key, ItemLabel(key)) end
             return c:GetData()
         end, "The food the food button's Feast toggle swaps to.")
         feast:SetValueChangedCallback(function() M:Update() end)
     end
 end
 
--- Food override hierarchy (global < class < spec). Class/Spec picker dropdowns
--- default to the logged-in character but let you configure any class/spec.
--- A food value of "" means inherit, so a level falls through to the next.
-function M:BuildFoodSettings(category, layout)
-    if not (PrepBar_Food and Settings.CreateDropdown) then return end
+-- Per-slot override hierarchy (global < class < spec) for flask, food and oil.
+-- Class/Spec picker dropdowns default to the logged-in character but let you
+-- configure any class/spec. A value of "" means inherit from the next level.
+function M:BuildOverrideSettings(category, layout)
+    if not (PrepBar_Overrides and Settings.CreateDropdown) then return end
     if layout and CreateSettingsListSectionHeaderInitializer then
-        layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Food"))
+        layout:AddInitializer(CreateSettingsListSectionHeaderInitializer("Consumable overrides"))
     end
-    local foodDB = PrepBar_Food:EnsureDB()
+    local ov = PrepBar_Overrides:EnsureDB()
 
     local classes = {}
     for token in pairs(PrepBar_Specs) do classes[#classes + 1] = token end
@@ -133,83 +149,89 @@ function M:BuildFoodSettings(category, layout)
     local curSpecIndex = GetSpecialization and GetSpecialization()
     local curSpec = curSpecIndex and GetSpecializationInfo(curSpecIndex) or SpecsOfClass(curClass)[1]
 
-    -- transient UI state: which class/spec the food dropdowns currently edit
-    local proxy = {
-        selClass  = curClass,
-        selSpec   = curSpec or 0,
-        classFood = foodDB.class[curClass] or "",
-        specFood  = (curSpec and foodDB.spec[tostring(curSpec)]) or "",
-    }
-
-    local function FoodOptions(inheritLabel)
-        return function()
-            local c = Settings.CreateControlTextContainer()
-            c:Add("", inheritLabel)
-            for _, key in ipairs(PrepBar_FoodChoices) do
-                c:Add(key, FoodLabel(key))
-            end
-            return c:GetData()
-        end
+    -- transient UI state: which class/spec the class/spec dropdowns edit, plus
+    -- the currently-shown value for each slot's class and spec dropdown.
+    local proxy = { selClass = curClass, selSpec = curSpec or 0, classVal = {}, specVal = {} }
+    for _, s in ipairs(OV_SLOTS) do
+        proxy.classVal[s.slot] = ov[s.slot].class[curClass] or ""
+        proxy.specVal[s.slot]  = (curSpec and ov[s.slot].spec[tostring(curSpec)]) or ""
     end
 
-    -- Global food
-    local g = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Food_Global",
-        "global", foodDB, Settings.VarType.String, "Global food", "")
-    Settings.CreateDropdown(category, g, FoodOptions("Default (Royal Roast)"),
-        "Food used when no class or spec override is set.")
-    g:SetValueChangedCallback(function() M:Update() end)
+    local classDrops, specDrops = {}, {}
 
-    -- Class picker + class food
-    local clsPick = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Food_SelClass",
+    -- Global scope: one dropdown per slot, bound straight to ov[slot].global.
+    for _, s in ipairs(OV_SLOTS) do
+        local set = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Ov_Global_" .. s.slot,
+            "global", ov[s.slot], Settings.VarType.String, "Global " .. s.label, "")
+        Settings.CreateDropdown(category, set, ChoiceOptions(s.slot, "Default (shipped)"),
+            "Global " .. s.label:lower() .. ", used when no class or spec override is set.")
+        set:SetValueChangedCallback(function() M:Update() end)
+    end
+
+    -- Class picker + one dropdown per slot (written through to ov[slot].class[selClass]).
+    local clsPick = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Ov_SelClass",
         "selClass", proxy, Settings.VarType.String, "Configure class", proxy.selClass)
     Settings.CreateDropdown(category, clsPick, function()
         local c = Settings.CreateControlTextContainer()
         for _, token in ipairs(classes) do c:Add(token, ClassName(token)) end
         return c:GetData()
-    end, "Which class to set food for. Defaults to your current class.")
+    end, "Which class to set overrides for. Defaults to your current class.")
 
-    local clsFood = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Food_Class",
-        "classFood", proxy, Settings.VarType.String, "Class food", "")
-    Settings.CreateDropdown(category, clsFood, FoodOptions("Inherit (global)"),
-        "Food for every spec of the selected class. Overrides the global food.")
-    clsFood:SetValueChangedCallback(function(_, v)
-        foodDB.class[proxy.selClass] = (v ~= "") and v or nil
-        M:Update()
-    end)
+    for _, s in ipairs(OV_SLOTS) do
+        local set = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Ov_Class_" .. s.slot,
+            s.slot, proxy.classVal, Settings.VarType.String, s.label .. " (class)", "")
+        Settings.CreateDropdown(category, set, ChoiceOptions(s.slot, "Inherit (global)"),
+            s.label .. " for every spec of the selected class.")
+        set:SetValueChangedCallback(function(_, v)
+            ov[s.slot].class[proxy.selClass] = (v ~= "") and v or nil
+            M:Update()
+        end)
+        classDrops[s.slot] = set
+    end
 
-    -- Spec picker + spec food
-    local specPick = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Food_SelSpec",
+    -- Spec picker + one dropdown per slot (written through to ov[slot].spec[selSpec]).
+    local specPick = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Ov_SelSpec",
         "selSpec", proxy, Settings.VarType.Number, "Configure spec", proxy.selSpec)
     Settings.CreateDropdown(category, specPick, function()
         local c = Settings.CreateControlTextContainer()
         for _, id in ipairs(SpecsOfClass(proxy.selClass)) do c:Add(id, SpecLabel(id)) end
         return c:GetData()
-    end, "Which spec to set food for. Defaults to your current spec.")
+    end, "Which spec to set overrides for. Defaults to your current spec.")
 
-    local specFood = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Food_Spec",
-        "specFood", proxy, Settings.VarType.String, "Spec food", "")
-    Settings.CreateDropdown(category, specFood, FoodOptions("Inherit (class)"),
-        "Food for the selected spec. Overrides class and global.")
-    specFood:SetValueChangedCallback(function(_, v)
-        if proxy.selSpec and proxy.selSpec ~= 0 then
-            foodDB.spec[tostring(proxy.selSpec)] = (v ~= "") and v or nil
-        end
-        M:Update()
-    end)
+    for _, s in ipairs(OV_SLOTS) do
+        local set = Settings.RegisterAddOnSetting(category, ADDON_NAME .. "_Ov_Spec_" .. s.slot,
+            s.slot, proxy.specVal, Settings.VarType.String, s.label .. " (spec)", "")
+        Settings.CreateDropdown(category, set, ChoiceOptions(s.slot, "Inherit (class)"),
+            s.label .. " for the selected spec. Overrides class and global.")
+        set:SetValueChangedCallback(function(_, v)
+            if proxy.selSpec and proxy.selSpec ~= 0 then
+                ov[s.slot].spec[tostring(proxy.selSpec)] = (v ~= "") and v or nil
+            end
+            M:Update()
+        end)
+        specDrops[s.slot] = set
+    end
 
-    -- Switching class repoints both food dropdowns (and resets the spec picker).
+    -- Switching class resets the spec picker and repoints every class/spec dropdown.
     clsPick:SetValueChangedCallback(function(_, token)
         proxy.selClass = token
         local first = SpecsOfClass(token)[1] or 0
         proxy.selSpec = first
         specPick:SetValue(first)
-        clsFood:SetValue(foodDB.class[token] or "")
-        specFood:SetValue((first ~= 0 and foodDB.spec[tostring(first)]) or "")
+        for _, s in ipairs(OV_SLOTS) do
+            proxy.classVal[s.slot] = ov[s.slot].class[token] or ""
+            classDrops[s.slot]:SetValue(proxy.classVal[s.slot])
+            proxy.specVal[s.slot] = (first ~= 0 and ov[s.slot].spec[tostring(first)]) or ""
+            specDrops[s.slot]:SetValue(proxy.specVal[s.slot])
+        end
     end)
 
-    -- Switching spec repoints the spec food dropdown.
+    -- Switching spec repoints every spec dropdown.
     specPick:SetValueChangedCallback(function(_, id)
         proxy.selSpec = id
-        specFood:SetValue((id ~= 0 and foodDB.spec[tostring(id)]) or "")
+        for _, s in ipairs(OV_SLOTS) do
+            proxy.specVal[s.slot] = (id ~= 0 and ov[s.slot].spec[tostring(id)]) or ""
+            specDrops[s.slot]:SetValue(proxy.specVal[s.slot])
+        end
     end)
 end

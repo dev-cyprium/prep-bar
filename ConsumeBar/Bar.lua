@@ -56,11 +56,13 @@ end
 function M:Init()
     if M.bar then return end
     M.EnsureDB()
-    if PrepBar_Food then
-        PrepBar_Food:EnsureDB()
-        for _, key in ipairs(PrepBar_FoodChoices) do  -- cache names/icons for the settings dropdowns
-            local id = PrepBar_Items[key] and PrepBar_Items[key][1]
-            if id then C_Item.RequestLoadItemDataByID(id) end
+    if PrepBar_Overrides then
+        PrepBar_Overrides:EnsureDB()
+        for _, keys in pairs(PrepBar_Choices) do  -- cache names/icons for the settings dropdowns
+            for _, key in ipairs(keys) do
+                local id = PrepBar_Items[key] and PrepBar_Items[key][1]
+                if id then C_Item.RequestLoadItemDataByID(id) end
+            end
         end
     end
 

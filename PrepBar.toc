@@ -1,4 +1,4 @@
-## Interface: 120000
+## Interface: 120100
 ## Title: PrepBar
 ## Author: Silkroot
 ## Version: 1.0.0
@@ -10,7 +10,7 @@
 
 Ids.lua
 Specs.lua
-Foods.lua
+Overrides.lua
 Consumables.lua
 Consumables\DeathKnight.lua
 Consumables\DemonHunter.lua

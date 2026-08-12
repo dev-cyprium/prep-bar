@@ -26,14 +26,22 @@ end
 
 function PrepBar_Consumables:Get(classToken, specID)
     local byClass = DATA[classToken]
-    local slots = byClass and byClass[specID]
-    if not slots then return nil end
+    local base = byClass and byClass[specID]
+    if not base then return nil end
+    -- Return a fresh table so overrides never mutate the registered spec data
+    -- (which would go stale once an override is cleared).
+    local slots = {}
+    for k, v in pairs(base) do slots[k] = v end
     for k, v in pairs(SHARED) do
         if slots[k] == nil then slots[k] = v end
     end
-    -- Food runs through the global/class/spec override hierarchy; resolve it
-    -- fresh every call so a changed (or cleared) override never goes stale.
-    slots.food = (PrepBar_Food and PrepBar_Food:ResolveOverride(classToken, specID)) or SHARED.food
+    -- Per-slot global/class/spec override hierarchy wins over the above.
+    if PrepBar_Overrides then
+        for _, slot in ipairs(PrepBar_OverrideSlots) do
+            local ov = PrepBar_Overrides:Resolve(slot, classToken, specID)
+            if ov then slots[PrepBar_Overrides:DataKey(slot)] = ov end
+        end
+    end
     return slots
 end
 
