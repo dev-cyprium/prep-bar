@@ -1,7 +1,7 @@
-## Interface: 120100
+## Interface: 120100, 120105
 ## Title: PrepBar
 ## Author: Silkroot
-## Version: 1.0.0
+## Version: 1.1.0
 ## Notes: A movable per-spec consumables bar (flask, food, weapon oil, augment rune).
 ## SavedVariables: PrepBarDB
 ## X-Category: Buffs & Debuffs
